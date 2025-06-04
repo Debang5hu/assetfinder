@@ -15,19 +15,18 @@ import (
 )
 
 func main() {
+	// 
 	var subsOnly bool
+	var excludeFlag string
+	var listSources bool
+
 	flag.BoolVar(&subsOnly, "subs-only", false, "Only include subdomains of search domain")
+	flag.StringVar(&excludeFlag, "exclude", "", "Comma-separated list of sources to exclude (e.g. crtsh,virustotal)")
+	flag.BoolVar(&listSources, "list-sources", false, "List all available sources and exit")
 	flag.Parse()
+	
 
-	var domains io.Reader
-	domains = os.Stdin
-
-	domain := flag.Arg(0)
-	if domain != "" {
-		domains = strings.NewReader(domain)
-	}
-
-	sources := []fetchFn{
+	/*sources := []fetchFn{
 		fetchCertSpotter,
 		fetchHackerTarget,
 		fetchThreatCrowd,
@@ -38,7 +37,69 @@ func main() {
 		fetchFindSubDomains,
 		fetchUrlscan,
 		fetchBufferOverrun,
+	}*/
+
+	sourceMap := map[string]fetchFn{
+		"certspotter":    fetchCertSpotter,
+		"hackertarget":   fetchHackerTarget,
+		"threatcrowd":    fetchThreatCrowd,
+		"crtsh":          fetchCrtSh,
+		"facebook":       fetchFacebook,
+		"virustotal":     fetchVirusTotal,
+		"findsubdomains": fetchFindSubDomains,
+		"urlscan":        fetchUrlscan,
+		"bufferoverrun":  fetchBufferOverrun,
 	}
+
+	if listSources {
+		fmt.Println("Available sources:")
+		for name := range sourceMap {
+			fmt.Println("-", name)
+		}
+		return
+	}
+
+	// exclude the sources
+	exclude := map[string]bool{}
+	if excludeFlag != "" {
+		for _, name := range strings.Split(excludeFlag, ",") {
+			exclude[strings.ToLower(strings.TrimSpace(name))] = true
+		}
+	}
+
+	sources := []fetchFn{}
+	for name, fn := range sourceMap {
+		if !exclude[name] {
+			sources = append(sources, fn)
+		}
+	}
+
+	// debug
+	if len(sources) == 0 {
+		fmt.Println("[INFO] No sources selected after applying -exclude flag.")
+		os.Exit(0)
+	}
+
+	var domains io.Reader
+	stat, _ := os.Stdin.Stat()
+	//domains = os.Stdin
+	
+	// stdin = 0
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		domains = os.Stdin
+	} else if flag.NArg() > 0 {
+		domains = strings.NewReader(flag.Arg(0))
+	} else {
+		fmt.Println("Usage: echo domain | assetfinder [flags]  OR  assetfinder [flags] domain")
+		fmt.Println()
+		fmt.Println("Flags:")
+		fmt.Println("  -subs-only      Only include subdomains of search domain")
+		fmt.Println("  -exclude        Comma-separated list of sources to exclude (e.g. crtsh,virustotal)")
+		fmt.Println("  -list-sources   List all available sources and exit")
+		os.Exit(1)
+	}
+
+	//
 
 	out := make(chan string)
 	var wg sync.WaitGroup

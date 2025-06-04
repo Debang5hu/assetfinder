@@ -46,7 +46,4 @@ Please feel free to issue pull requests with new sources! :)
 * http://www.dnsdb.org/
 * https://certdb.com/api-documentation
 
-## TODO
-* Flags to control which sources are used
-    * Likely to be all on by default and a flag to disable
-* Read domains from stdin
+
